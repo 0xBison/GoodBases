@@ -928,6 +928,21 @@ export class NotionTableView extends BasesView {
 	}
 
 	/**
+	 * Fixed choices for a property from the view's `selectOptions` list, one
+	 * `property=value` string per item (property names match case-insensitively).
+	 */
+	private selectOptionsFor(propName: string): string[] {
+		const raw = this.config.get('selectOptions');
+		if (!Array.isArray(raw)) return [];
+		const out: string[] = [];
+		for (const item of raw) {
+			const m = /^\s*([^=]+?)\s*=\s*(.+?)\s*$/.exec(String(item));
+			if (m && m[1].toLowerCase() === propName.toLowerCase()) out.push(m[2]);
+		}
+		return out;
+	}
+
+	/**
 	 * Open the select editor anchored anywhere — a table cell or a property
 	 * row of the page panel. Known values always come from the live query
 	 * result; lifetime stays with the view (outside-click / Esc / unload).
@@ -938,6 +953,7 @@ export class NotionTableView extends BasesView {
 			container: opts.container ?? this.rootEl.doc.body,
 			anchor: opts.anchor,
 			entries: this.data.data,
+			extraOptions: this.selectOptionsFor(opts.propName),
 			file: opts.file,
 			current: opts.current,
 			prop: `note.${opts.propName}` as BasesPropertyId,

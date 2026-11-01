@@ -24,6 +24,11 @@ export interface SelectEditorDeps extends FloatingEditorDeps {
 	current: string[];
 	/** True for list (multi-select) properties; false for scalar (single-select). */
 	isList: boolean;
+	/**
+	 * Fixed choices offered even when no entry in the result uses them yet
+	 * (the view's `selectOptions` for this property).
+	 */
+	extraOptions?: string[];
 	/** Color a pill element for the given value. */
 	applyColor: (pill: HTMLElement, text: string) => void;
 	/** Persist the chosen value (`null` deletes the property). */
@@ -59,6 +64,10 @@ export class SelectEditor extends FloatingEditor<SelectEditorDeps> {
 					this.known.set(display.toLowerCase(), display);
 				}
 			}
+		}
+
+		for (const opt of deps.extraOptions ?? []) {
+			if (opt && !this.known.has(opt.toLowerCase())) this.known.set(opt.toLowerCase(), opt);
 		}
 
 		this.selected = current.map((s) => s.replace(/^#/, ''));
