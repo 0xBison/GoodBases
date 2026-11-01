@@ -90,7 +90,7 @@ export class SelectEditor extends FloatingEditor<SelectEditorDeps> {
 		}
 
 		for (const opt of deps.extraOptions ?? []) {
-			if (opt && !this.known.has(opt.toLowerCase())) this.known.set(opt.toLowerCase(), opt);
+			if (opt && !this.known.has(optionKey(opt))) this.known.set(optionKey(opt), opt);
 		}
 
 		this.selected = current.map((s) => s.replace(/^#/, ''));
