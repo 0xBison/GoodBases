@@ -17,6 +17,29 @@ import { NOTION_COLORS, applyColorVars, customColor } from '../lib/colors';
 import { valueToStrings } from '../lib/values';
 import { FloatingEditor, FloatingEditorDeps } from './floating-editor';
 
+/** A whole-value wikilink: `[[path]]`, `[[path#heading]]`, `[[path|alias]]`. */
+const LINK_RE = /^\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]*))?\]\]$/;
+
+/**
+ * What a value shows as: a wikilink shows its alias, else its note name
+ * (`[[Data/projects/x|Name]]` → "Name", `[[Data/projects/x]]` → "x");
+ * anything else shows as written.
+ */
+export function optionLabel(s: string): string {
+	const m = LINK_RE.exec(s.trim());
+	return m ? (m[2] || m[1].trim().split('/').pop() || s) : s;
+}
+
+/**
+ * Identity of a value for de-duplication: a wikilink is keyed by its target
+ * (so `[[x]]` and `[[x|Name]]` are one option), anything else by its
+ * lowercase text.
+ */
+function optionKey(s: string): string {
+	const m = LINK_RE.exec(s.trim());
+	return (m ? `[[${m[1].trim()}]]` : s).toLowerCase();
+}
+
 export interface SelectEditorDeps extends FloatingEditorDeps {
 	/** Every entry in the current result, used to list the known values. */
 	entries: BasesEntry[];
@@ -41,7 +64,7 @@ export class SelectEditor extends FloatingEditor<SelectEditorDeps> {
 
 	/** Currently selected values (display form, leading `#` stripped). */
 	private selected: string[];
-	/** Distinct known values for this property: lowercase key → display text. */
+	/** Distinct known values for this property: {@link optionKey} → display text. */
 	private readonly known = new Map<string, string>();
 
 	private pillsWrap!: HTMLElement;
@@ -55,8 +78,8 @@ export class SelectEditor extends FloatingEditor<SelectEditorDeps> {
 		for (const e of entries) {
 			for (const s of valueToStrings(e.getValue(prop))) {
 				const display = s.replace(/^#/, '');
-				if (display && !this.known.has(display.toLowerCase())) {
-					this.known.set(display.toLowerCase(), display);
+				if (display && !this.known.has(optionKey(display))) {
+					this.known.set(optionKey(display), display);
 				}
 			}
 		}
@@ -121,7 +144,7 @@ export class SelectEditor extends FloatingEditor<SelectEditorDeps> {
 		for (const v of this.selected) {
 			const pill = this.pillsWrap.createSpan({ cls: 'ntn-pill' });
 			this.deps.applyColor(pill, v);
-			pill.createSpan({ text: v });
+			pill.createSpan({ text: optionLabel(v) });
 			const x = pill.createSpan({ cls: 'ntn-pill-remove', text: '✕' });
 			x.addEventListener('click', (evt) => {
 				evt.stopPropagation();
@@ -135,11 +158,11 @@ export class SelectEditor extends FloatingEditor<SelectEditorDeps> {
 
 	private pick(v: string): void {
 		if (this.deps.isList) {
-			const has = this.selected.some((s) => s.toLowerCase() === v.toLowerCase());
+			const has = this.selected.some((s) => optionKey(s) === optionKey(v));
 			this.selected = has
-				? this.selected.filter((s) => s.toLowerCase() !== v.toLowerCase())
+				? this.selected.filter((s) => optionKey(s) !== optionKey(v))
 				: [...this.selected, v];
-			if (!this.known.has(v.toLowerCase())) this.known.set(v.toLowerCase(), v);
+			if (!this.known.has(optionKey(v))) this.known.set(optionKey(v), v);
 			this.write();
 			this.input.value = '';
 			this.renderPills();
@@ -157,9 +180,10 @@ export class SelectEditor extends FloatingEditor<SelectEditorDeps> {
 		this.optionsEl.empty();
 		const q = this.input.value.trim();
 		const ql = q.toLowerCase();
+		// Search and sort by what the option shows (a link's name, not its path).
 		const visible = [...this.known.values()]
-			.filter((o) => !ql || o.toLowerCase().includes(ql))
-			.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+			.filter((o) => !ql || optionLabel(o).toLowerCase().includes(ql))
+			.sort((a, b) => optionLabel(a).localeCompare(optionLabel(b), undefined, { sensitivity: 'base' }));
 		for (const o of visible) {
 			const row = this.optionsEl.createDiv({ cls: 'ntn-select-option' });
 			// A colored square (left of the label) showing the value's current
@@ -175,13 +199,14 @@ export class SelectEditor extends FloatingEditor<SelectEditorDeps> {
 			});
 			const pill = row.createSpan({ cls: 'ntn-pill' });
 			this.deps.applyColor(pill, o);
-			pill.setText(o);
-			if (this.selected.some((s) => s.toLowerCase() === o.toLowerCase())) {
+			pill.setText(optionLabel(o));
+			pill.setAttr('title', o);
+			if (this.selected.some((s) => optionKey(s) === optionKey(o))) {
 				row.createSpan({ cls: 'ntn-select-check', text: '✓' });
 			}
 			row.addEventListener('click', () => this.pick(o));
 		}
-		if (q && !this.known.has(ql)) {
+		if (q && !this.known.has(ql) && !visible.some((o) => optionLabel(o).toLowerCase() === ql)) {
 			const row = this.optionsEl.createDiv({ cls: 'ntn-select-option' });
 			row.createSpan({ cls: 'ntn-select-create', text: 'Create' });
 			const pill = row.createSpan({ cls: 'ntn-pill' });

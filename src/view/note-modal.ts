@@ -27,6 +27,7 @@ import { LOG_PREFIX } from '../constants';
 import { splitFrontmatter } from '../lib/frontmatter';
 import { openTagSearch } from '../lib/tag-search';
 import { createLiveEditor, LiveEditor } from './live-editor';
+import { optionLabel } from './select-editor';
 
 /** What any floating editor needs to open anchored to a property row / cell. */
 interface OpenEditorOpts {
@@ -328,7 +329,9 @@ export class NotePageModal extends Modal {
 			for (const item of items) {
 				const pill = valueEl.createSpan({ cls: 'ntn-pill' });
 				this.deps.applyColor(pill, item);
-				pill.setText(item.replace(/^#/, ''));
+				// A link shows its name; the full link stays in the tooltip.
+				pill.setText(optionLabel(item).replace(/^#/, ''));
+				if (optionLabel(item) !== item) pill.setAttr('title', item);
 				// A tag pill searches on click (and closes the panel); the
 				// row's empty space still opens the editor.
 				if (isTags) this.makeTagPill(pill, item);
